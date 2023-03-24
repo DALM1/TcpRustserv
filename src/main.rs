@@ -1,96 +1,47 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::thread;
+fn handle_client_connection(mut stream: TcpStream) {
+    // Demande le mot de passe
+    let mut data = [0 as u8; 1024];
+    stream.write(b"Entrez le mot de passe: ").unwrap();
+    let size = stream.read(&mut data).unwrap();
+    let password = std::str::from_utf8(&data[0..size]).unwrap().trim();
 
-fn handle_client(stream: TcpStream, users: Arc<Mutex<Vec<String>>>) {
-    let mut stream = BufReader::new(stream);
-    let mut line = String::new();
-
-   
-    let password = "my_secret_password";
-    write!(stream.get_mut(), "Enter password: ").unwrap();
-    stream.get_mut().flush().unwrap();
-
-   
-    stream.read_line(&mut line).unwrap();
-    let password_attempt = line.trim();
-
-    
-    if password_attempt != password {
-        write!(stream.get_mut(), "Incorrect password\n").unwrap();
+    // Vérifie le mot de passe
+    if password != "my_secret_password" {
+        stream.write(b"Mot de passe incorrect").unwrap();
         return;
     }
 
-   
-    line.clear();
-    write!(stream.get_mut(), "Enter username: ").unwrap();
-    stream.get_mut().flush().unwrap();
+    // Demande le nom d'utilisateur
+    stream.write(b"Entrez votre nom d'utilisateur: ").unwrap();
+    let size = stream.read(&mut data).unwrap();
+    let username = std::str::from_utf8(&data[0..size]).unwrap().trim();
 
-   
-    stream.read_line(&mut line).unwrap();
-    let username = line.trim().to_owned();
+    stream.write(b"Connexion réussie").unwrap();
 
-    
-    users.lock().unwrap().push(username.clone());
+    // Ajoute l'utilisateur à la liste
+    let mut users = USERS.lock().unwrap();
+    users.insert(stream.try_clone().unwrap(), String::from(username));
 
-   
-    let message = format!("{} has joined the chat\n", username);
-    println!("{}", message);
-    for user in users.lock().unwrap().iter() {
-        let mut user_stream = stream.get_ref().try_clone().unwrap();
-        write!(user_stream, "{}", message).unwrap();
-        user_stream.flush().unwrap();
-    }
+    // Envoie le message de bienvenue
+    let message = format!("{} a rejoint le chat\n", username);
+    broadcast_message(&stream, &message);
 
-   
+    // Lit les messages entrants et les diffuse à tous les utilisateurs
     loop {
-        line.clear();
-        stream.read_line(&mut line).unwrap();
-        let message = line.trim().to_owned();
+        let mut data = [0 as u8; 1024];
+        let size = stream.read(&mut data).unwrap();
+        let message = std::str::from_utf8(&data[0..size]).unwrap().trim();
 
-        // If the user sends an empty message, they have left the chat
-        if message.is_empty() {
-            let index = users.lock().unwrap().iter().position(|u| u == &username).unwrap();
-            users.lock().unwrap().remove(index);
-            let message = format!("{} has left the chat\n", username);
-            println!("{}", message);
-            for user in users.lock().unwrap().iter() {
-                let mut user_stream = stream.get_ref().try_clone().unwrap();
-                write!(user_stream, "{}", message).unwrap();
-                user_stream.flush().unwrap();
-            }
+        if message == "/quit" {
             break;
         }
 
-      
         let message = format!("{}: {}\n", username, message);
-        println!("{}", message);
-        for user in users.lock().unwrap().iter() {
-            if user != &username {
-                let mut user_stream = stream.get_ref().try_clone().unwrap();
-                write!(user_stream, "{}", message).unwrap();
-                user_stream.flush().unwrap();
-            }
-        }
+        broadcast_message(&stream, &message);
     }
-}
 
-fn main() {
-    let listener = TcpListener::bind("localhost:5000").unwrap();
-    let users = Arc::new(Mutex::new(Vec::new()));
-
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let users = users.clone();
-                thread::spawn(move || {
-                    handle_client(stream, users);
-                });
-            }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-            }
-        }
-    }
+    // Retire l'utilisateur de la liste et envoie un message de départ
+    users.remove(&stream.try_clone().unwrap());
+    let message = format!("{} a quitté le chat\n", username);
+    broadcast_message(&stream, &message);
 }
