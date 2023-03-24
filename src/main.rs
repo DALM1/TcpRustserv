@@ -33,7 +33,7 @@ fn handle_client(
     let mut reader = BufReader::new(&stream);
     let mut username = String::new();
 
-    // Prompt the client for a username and store it in the 'username' variable
+  
     loop {
         stream.write_all(b"Enter your username: ").unwrap();
         stream.flush().unwrap();
@@ -58,7 +58,6 @@ fn handle_client(
         }
     }
 
-    // Check the client's password
     loop {
         stream.write_all(b"Enter the password: ").unwrap();
         stream.flush().unwrap();
@@ -76,7 +75,7 @@ fn handle_client(
         }
     }
 
-    // Send messages to other clients
+
     loop {
         let mut message = String::new();
         reader.read_line(&mut message).unwrap();
