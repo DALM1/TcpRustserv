@@ -45,3 +45,29 @@ fn handle_client_connection(mut stream: TcpStream) {
     let message = format!("{} a quitté le chat\n", username);
     broadcast_message(&stream, &message);
 }
+
+
+
+fn main() -> std::io::Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:5000")?;
+    let password = "my_secret_password".to_string(); // définir un mot de passe
+    let mut clients = HashMap::new();
+    println!("Serveur en attente de connexions sur le port 5000...");
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let password = password.clone();
+                let mut clients = clients.clone();
+                thread::spawn(move || {
+                    handle_client(stream, &password, &mut clients);
+                });
+            }
+            Err(e) => {
+                println!("Erreur lors de la connexion : {}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
