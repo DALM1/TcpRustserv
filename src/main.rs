@@ -7,12 +7,12 @@ use std::thread;
 fn handle_client(mut stream: TcpStream, password: &str, users: Arc<Mutex<HashMap<TcpStream, String>>>) {
     let mut data = [0 as u8; 1024];
     
-    // Demander le mot de passe
+   
     stream.write(b"Entrez le mot de passe: ").unwrap();
     let size = stream.read(&mut data).unwrap();
     let password_input = std::str::from_utf8(&data[0..size]).unwrap().trim();
 
-    // Vérifier le mot de passe
+    
     if password_input != password {
         stream.write(b"Mot de passe incorrect").unwrap();
         return;
@@ -23,18 +23,18 @@ fn handle_client(mut stream: TcpStream, password: &str, users: Arc<Mutex<HashMap
     let size = stream.read(&mut data).unwrap();
     let username = std::str::from_utf8(&data[0..size]).unwrap().trim();
 
-    // Confirmer la connexion
+   
     stream.write(b"Connexion réussie").unwrap();
 
-    // Ajouter l'utilisateur à la liste
+    
     let mut users = users.lock().unwrap();
     users.insert(stream.try_clone().unwrap(), String::from(username));
 
-    // Diffuser le message de connexion
+   
     let message = format!("{} a rejoint le chat\n", username);
     broadcast_message(&stream, &message, &users);
 
-    // Attendre les messages de l'utilisateur
+   
     loop {
         let mut data = [0 as u8; 1024];
         let size = stream.read(&mut data).unwrap();
