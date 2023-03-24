@@ -7,34 +7,34 @@ fn handle_client(stream: TcpStream, users: Arc<Mutex<Vec<String>>>) {
     let mut stream = BufReader::new(stream);
     let mut line = String::new();
 
-    // Prompt the user for the password
+   
     let password = "my_secret_password";
     write!(stream.get_mut(), "Enter password: ").unwrap();
     stream.get_mut().flush().unwrap();
 
-    // Read the password
+   
     stream.read_line(&mut line).unwrap();
     let password_attempt = line.trim();
 
-    // Check the password
+    
     if password_attempt != password {
         write!(stream.get_mut(), "Incorrect password\n").unwrap();
         return;
     }
 
-    // Prompt the user for their username
+   
     line.clear();
     write!(stream.get_mut(), "Enter username: ").unwrap();
     stream.get_mut().flush().unwrap();
 
-    // Read the username
+   
     stream.read_line(&mut line).unwrap();
     let username = line.trim().to_owned();
 
-    // Add the user to the list of active users
+    
     users.lock().unwrap().push(username.clone());
 
-    // Broadcast that the user has joined the chat
+   
     let message = format!("{} has joined the chat\n", username);
     println!("{}", message);
     for user in users.lock().unwrap().iter() {
@@ -43,7 +43,7 @@ fn handle_client(stream: TcpStream, users: Arc<Mutex<Vec<String>>>) {
         user_stream.flush().unwrap();
     }
 
-    // Handle incoming messages
+   
     loop {
         line.clear();
         stream.read_line(&mut line).unwrap();
@@ -63,7 +63,7 @@ fn handle_client(stream: TcpStream, users: Arc<Mutex<Vec<String>>>) {
             break;
         }
 
-        // Broadcast the message to all other users
+      
         let message = format!("{}: {}\n", username, message);
         println!("{}", message);
         for user in users.lock().unwrap().iter() {
