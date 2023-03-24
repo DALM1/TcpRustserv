@@ -1,65 +1,63 @@
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::io::prelude::*;
+use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-type UserList = Arc<Mutex<HashMap<TcpStream, String>>>;
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let password = "password";
+    let clients: HashMap<String, TcpStream> = HashMap::new();
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let clients = clients.clone();
+                thread::spawn(move || {
+                    handle_client(stream, password, &mut clients.lock().unwrap());
+                });
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+            }
+        }
+    }
+}
 
 fn handle_client(mut stream: TcpStream, password: &str, clients: &mut HashMap<String, TcpStream>) {
-    let mut data = [0 as u8; 1024];
+    let mut buffer = [0; 1024];
+    let mut username = String::new();
 
-    stream.write(b"Entrez le mot de passe: ").unwrap();
-    let size = stream.read(&mut data).unwrap();
-    let password_input = std::str::from_utf8(&data[0..size]).unwrap().trim();
+    stream.write(b"Enter a username: ").unwrap();
+    stream.read(&mut buffer).unwrap();
+    username.push_str(&String::from_utf8_lossy(&buffer[..]).trim());
 
-    if password_input != password {
-        stream.write(b"Mot de passe incorrect").unwrap();
+    if username == password {
+        stream.write(b"Invalid username.\n").unwrap();
         return;
     }
 
-    stream.write(b"Entrez votre nom d'utilisateur: ").unwrap();
-    let size = stream.read(&mut data).unwrap();
-    let username = std::str::from_utf8(&data[0..size]).unwrap().trim();
-
-    clients.insert(String::from(username), stream.try_clone().unwrap());
-    stream.write(b"Connexion reussie.\n").unwrap();
+    clients.insert(username.clone(), stream.try_clone().unwrap());
+    let welcome_message = format!("Welcome, {}!", username);
+    broadcast_message(clients, &welcome_message);
 
     loop {
-        let mut data = [0 as u8; 1024];
-        let size = stream.read(&mut data).unwrap();
-        let message = std::str::from_utf8(&data[0..size]).unwrap().trim();
-
-        if message == "/quit" {
-            let goodbye_message = format!("{} a quitte le chat.\n", username);
+        let mut buffer = [0; 1024];
+        let nbytes = stream.read(&mut buffer).unwrap();
+        if nbytes == 0 {
+            let goodbye_message = format!("{} has left the chat.", username);
+            clients.remove(&username);
             broadcast_message(clients, &goodbye_message);
-            clients.remove(&String::from(username));
             break;
         }
-
-        let message = format!("{}: {}\n", username, message);
+        let message = String::from_utf8_lossy(&buffer[..nbytes]).trim().to_string();
+        let message = format!("{}: {}", username, message);
         broadcast_message(clients, &message);
     }
 }
 
-fn broadcast_message(clients: &mut HashMap<String, TcpStream>, message: &str) {
-    for client in clients.values_mut() {
+fn broadcast_message(clients: &HashMap<String, TcpStream>, message: &str) {
+    for client in clients.values() {
         client.write(message.as_bytes()).unwrap();
-    }
-}
-
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:5000").unwrap();
-    let password = "secret";
-    let clients: UserList = Arc::new(Mutex::new(HashMap::new()));
-
-    for stream in listener.incoming() {
-        let password = password.to_string();
-        let clients = clients.clone();
-
-        thread::spawn(move || {
-            let mut stream = stream.unwrap();
-            handle_client(stream, &password, &mut clients.lock().unwrap());
-        });
+        client.write(b"\n").unwrap();
     }
 }
