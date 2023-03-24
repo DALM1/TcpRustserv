@@ -102,6 +102,5 @@ fn handle_client(
         for client_username in to_remove {
             clients.remove(&client_username);
         }
-        
-      
-      
+    }
+}
