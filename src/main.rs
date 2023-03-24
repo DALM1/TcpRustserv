@@ -2,10 +2,8 @@ use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use std::thread;
 
 type UserList = Arc<Mutex<HashMap<TcpStream, String>>>;
-
 
 fn handle_client(mut stream: TcpStream, password: &str, clients: &mut HashMap<String, TcpStream>) {
     let mut data = [0 as u8; 1024];
@@ -43,62 +41,39 @@ fn handle_client(mut stream: TcpStream, password: &str, clients: &mut HashMap<St
     }
 }
 
+fn broadcast_message(clients: &mut HashMap<String, TcpStream>, message: &str) {
+    let mut to_remove = vec![];
 
+    for (username, client) in clients.iter_mut() {
+        let message_bytes = message.as_bytes();
+        if client.write(message_bytes).is_err() {
+            to_remove.push(username.clone());
+        }
+    }
 
+    for username in to_remove {
+        clients.remove(&username);
+    }
+}
 
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:12345").unwrap();
+    let password = "password";
+    let clients: UserList = Arc::new(Mutex::new(HashMap::new()));
 
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let clients = clients.clone();
+                let password = password.to_owned();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                thread::spawn(move || {
+                    handle_client(stream, &password, &mut clients.lock().unwrap());
+                });
+            }
+            Err(e) => {
+                println!("Erreur de connexion: {}", e);
+            }
+        }
+    }
+}
