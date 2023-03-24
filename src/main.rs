@@ -49,7 +49,7 @@ fn broadcast_message(clients: &mut HashMap<String, TcpStream>, message: &str) {
 }
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:5000").unwrap();
     let password = "secret";
     let clients: UserList = Arc::new(Mutex::new(HashMap::new()));
 
